@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3 Botões — Fotos Fullscreen</title>
+  <style>
+    :root{--gap:18px;--btn-h:180px}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Helvetica,Arial}
+    body{display:flex;align-items:center;justify-content:center;padding:24px;background:#111}
+
+    .container{
+      width:100%;max-width:1100px;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);
+    }
+
+    /* botão como bloco com imagem de fundo */
+    .photo-btn{
+      position:relative;overflow:hidden;border-radius:12px;height:var(--btn-h);cursor:pointer;display:flex;align-items:flex-end;justify-content:flex-start;
+      box-shadow:0 6px 24px rgba(0,0,0,0.6);border:2px solid rgba(255,255,255,0.04);transition:transform .25s ease, box-shadow .25s ease;
+      background-size:cover;background-position:center center;background-repeat:no-repeat;
+    }
+    .photo-btn:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(0,0,0,0.6)}
+
+    .photo-btn .label{
+      backdrop-filter:blur(6px);background:linear-gradient(90deg, rgba(0,0,0,0.55), rgba(0,0,0,0.25));color:#fff;padding:12px 16px;margin:12px;border-radius:8px;font-weight:600;font-size:16px
+    }
+
+    /* fullscreen overlay */
+    .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:9999}
+    .overlay.open{display:flex}
+    .overlay img{max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 20px 60px rgba(0,0,0,0.8);border-radius:6px}
+
+    .close-btn{position:fixed;top:18px;right:18px;background:rgba(255,255,255,0.06);border:none;color:#fff;padding:10px 12px;border-radius:8px;font-weight:700;cursor:pointer;backdrop-filter:blur(6px)}
+
+    /* mobile: stack vertically */
+    @media (max-width:720px){
+      .container{grid-template-columns:1fr;}
+      :root{--btn-h:220px}
+    }
+  </style>
+</head>
+<body>
+  <div style="width:100%;max-width:1100px;color:#fff;margin-bottom:12px;text-align:center">
+    <h1 style="margin:6px 0;font-size:20px">Driagramas </h1>
+  </div>
+
+  <main class="container">
+    <button class="photo-btn" data-img="./classe.png" style="background-image:url('https://i.pinimg.com/1200x/85/91/97/859197b31100a8cbc0db27ef8c9e1288.jpg')">
+      <span class="label">Diagrama de classe</span>
+    </button>
+
+    <button class="photo-btn" data-img="./image.png" style="background-image:url('https://i.pinimg.com/736x/a6/03/21/a603218470eff2a48a43c1d7d1ffae52.jpg')">
+      <span class="label">Caso de uso</span>
+    </button>
+
+    <button class="photo-btn" data-img="./perrota.png" style="background-image:url('https://i.pinimg.com/1200x/e4/dc/b2/e4dcb20fb8b173104ef0fec1fd1468a1.jpg')">
+      <span class="label">Diagrama de sequência</span>
+    </button>
+  </main>
+
+  <!-- overlay fullscreen -->
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <button id="closeBtn" class="close-btn" aria-label="Fechar">FECHAR ✕</button>
+    <img id="overlayImg" alt="Foto em tela cheia" src="" />
+  </div>
+
+  <script>
+    
+const buttons = document.querySelectorAll('.photo-btn');
+const overlay = document.getElementById('overlay');
+const overlayImg = document.getElementById('overlayImg');
+const closeBtn = document.getElementById('closeBtn');
+
+let scale = 1;
+let posX = 0, posY = 0;
+let startX = 0, startY = 0;
+let dragging = false;
+
+function openOverlay(src) {
+  overlayImg.src = src;
+  overlay.classList.add('open');
+  document.body.style.overflow = "hidden";
+  resetZoom();
+}
+
+buttons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const src = btn.getAttribute('data-img');
+    openOverlay(src);
+  });
+});
+
+function closeOverlay() {
+  overlay.classList.remove('open');
+  overlayImg.src = "";
+  document.body.style.overflow = "";
+}
+
+closeBtn.addEventListener('click', closeOverlay);
+overlay.addEventListener('click', e => {
+  if (e.target === overlay) closeOverlay();
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === "Escape") closeOverlay();
+});
+
+/* 📌 Aplicar o zoom + pan */
+function updateTransform() {
+  overlayImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+}
+
+/* ✅ Zoom com scroll e Ctrl (igual Google) */
+overlay.addEventListener("wheel", function(e) {
+  if (!overlay.classList.contains("open")) return;
+  e.preventDefault();
+
+  let zoomSpeed = e.ctrlKey ? 0.25 : 0.12; // CTRL = mais forte
+  scale += (e.deltaY < 0 ? zoomSpeed : -zoomSpeed);
+  scale = Math.min(Math.max(scale, 1), 5);
+
+  updateTransform();
+}, { passive: false });
+
+/* ✅ Arrastar imagem com mouse */
+overlayImg.addEventListener("mousedown", e => {
+  if (scale <= 1) return;
+  dragging = true;
+  startX = e.clientX - posX;
+  startY = e.clientY - posY;
+  overlayImg.style.cursor = "grabbing";
+});
+
+overlay.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  posX = e.clientX - startX;
+  posY = e.clientY - startY;
+  updateTransform();
+});
+
+window.addEventListener("mouseup", () => {
+  dragging = false;
+  overlayImg.style.cursor = "grab";
+});
+
+/* ✅ Duplo clique para resetar */
+overlayImg.addEventListener("dblclick", resetZoom);
+
+function resetZoom() {
+  scale = 1;
+  posX = 0;
+  posY = 0;
+  dragging = false;
+  updateTransform();
+}
+  </script>
+</body>
+</html>
